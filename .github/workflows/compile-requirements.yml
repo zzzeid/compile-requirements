@@ -1,4 +1,4 @@
-name: Generate Requirements
+name: Generate requirement files
 
 on:
   workflow_call:

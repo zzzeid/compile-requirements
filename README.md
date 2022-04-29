@@ -1,6 +1,6 @@
 Description
 ===========
-This GitHub workflow generates requirements files given a combination of operating systems and Python versions, and updates pull requests with those generated files.
+This GitHub workflow generates pip requirements files given a combination of operating systems and Python versions, and updates pull requests with those generated files.
 
 
 Example Usage
