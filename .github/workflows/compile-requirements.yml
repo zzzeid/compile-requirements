@@ -4,10 +4,24 @@ on:
   workflow_call:
     inputs:
       os:
-        required: true
+        default: '["ubuntu-latest"]'
+        description: A string representation of a list of operating systems.
+        required: false
         type: string
       python:
-        required: true
+        default: '["3.10"]'
+        description: A string representation of a list of Python versions.
+        required: false
+        type: string
+      requirements_directory:
+        default: requirements
+        description: The directory where requirements.in is located.
+        required: false
+        type: string
+      requirements_files:
+        default: '["requirements.in"]'
+        description: A string representation of a list of requirement files.
+        required: false
         type: string
 
 jobs:
@@ -17,6 +31,7 @@ jobs:
       matrix:
         os: ${{ fromJSON(inputs.os) }}
         python-version: ${{ fromJSON(inputs.python) }}
+        requirements_file: ${{ fromJSON(inputs.requirements_files) }}
     steps:
       - uses: actions/checkout@v2
         with:
@@ -32,14 +47,14 @@ jobs:
       - name: Generate
         # Generate filename based on Python version and OS.
         run: |
-          cd requirements
-          python -m piptools compile --generate-hashes --output-file requirements-${{ matrix.python-version }}-${{ runner.os }}.txt
+          cd ${{ inputs.requirements_directory }}
+          python -m piptools compile --verbose ${{ matrix.requirements_file }} --generate-hashes --allow-unsafe --output-file requirements-${{ matrix.python-version }}-${{ runner.os }}.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@v2
         with:
-          name: requirements-${{ matrix.python-version }}-${{ runner.os }}.txt
-          path: requirements/requirements-*.txt
+          name: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_attempt }}-requirements
+          path: requirements/requirements-${{ matrix.python-version }}-${{ runner.os }}.txt
   commit-and-push:
     needs: compile-requirements
     runs-on: ubuntu-latest
@@ -49,6 +64,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v3
         with:
+          name: ${{ github.sha }}-${{ github.run_number }}-${{ github.run_attempt }}-requirements
           path: temp-requirements
       - name: Configure git
         run: |
@@ -58,9 +74,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mv temp-requirements/requirements-*/* requirements/.
-          rm -R temp-requirements
+          git status
+          git pull --rebase
+          find temp-requirements -name "requirements-*" -type f -exec mv -f -t requirements {} +
           git add -A
           git commit -m "Automatically generated requirements"
-          git pull -f https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git --rebase
           git push -f https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
